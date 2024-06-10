@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PriceGeek</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="navbar">
+        <div class="logo">PriceGeek</div>
+    </div>
+    <div class="content">
+        <select id="dropdown-make" onchange="fetchCarModels()">
+            <option value="" disabled selected>Select a car make</option>
+            {% for make in car_makes %}
+                <option value="{{ make }}">{{ make }}</option>
+            {% endfor %}
+        </select>
+
+        <select id="dropdown-model">
+            <option value="" disabled selected>Select a model</option>
+        </select>
+    </div>
+
+    <script>
+        function fetchCarModels() {
+            var carMake = $('#dropdown-make').val();
+            console.log("Selected car make: " + carMake); // Debug log
+            $.ajax({
+                url: '/get_car_models',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({car_make: carMake}),
+                success: function(models) {
+                    console.log("Received models: ", models); // Debug log
+                    var modelDropdown = $('#dropdown-model');
+                    modelDropdown.empty();
+                    modelDropdown.append('<option value="" disabled selected>Select a model</option>');
+                    models.forEach(function(model) {
+                        modelDropdown.append('<option value="' + model + '">' + model + '</option>');
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to fetch models: ", status, error); // Debug log
+                }
+            });
+        }
+    </script>
+</body>
+</html>
