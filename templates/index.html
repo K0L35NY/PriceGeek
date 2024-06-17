@@ -12,6 +12,7 @@
         <div class="logo">PriceGeek</div>
     </div>
     <div class="content">
+        <h2>Select Car Details to Scrape Auctions</h2>
         <select id="dropdown-make" onchange="fetchCarModels()">
             <option value="" disabled selected>Select a car make</option>
             {% for make in car_makes %}
@@ -19,9 +20,65 @@
             {% endfor %}
         </select>
 
-        <select id="dropdown-model">
+        <select id="dropdown-model" onchange="fetchCarGenerations()">
             <option value="" disabled selected>Select a model</option>
         </select>
+
+        <select id="dropdown-generation">
+            <option value="" disabled selected>Select a generation (if applicable)</option>
+        </select>
+
+        <button onclick="scrapeAuctions()">Scrape Auctions</button>
+        <div id="download-link" style="display:none;">
+            <a id="csv-download" href="#">Download CSV</a>
+        </div>
+
+        <h2>Or Upload Existing Auction Data</h2>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" id="file-input" name="file" accept=".csv">
+            <button type="button" onclick="uploadCSV()">Upload CSV</button>
+        </form>
+        <div id="upload-result" style="display:none;">
+            <p id="upload-message"></p>
+        </div>
+
+        <h2>Predict Car Price</h2>
+        <form id="price-prediction-form">
+            <label for="engine_size">Engine Size (cm3):</label>
+            <input type="number" id="engine_size" name="engine_size" required><br><br>
+
+            <label for="horsepower">Horsepower (KM):</label>
+            <input type="number" id="horsepower" name="horsepower" required><br><br>
+
+            <label for="mileage">Mileage (km):</label>
+            <input type="number" id="mileage" name="mileage" required><br><br>
+
+            <label for="gearbox">Gearbox:</label>
+            <select id="gearbox" name="gearbox" required>
+                <option value="0">Manual</option>
+                <option value="1">Automatic</option>
+            </select><br><br>
+
+            <label for="production_year">Production Year:</label>
+            <input type="number" id="production_year" name="production_year" required><br><br>
+
+            <label for="fuel_type">Fuel Type:</label>
+            <select id="fuel_type" name="fuel_type" required>
+                <option value="0">Benzyna</option>
+                <option value="1">Diesel</option>
+                <option value="2">Benzyna+LPG</option>
+                <option value="3">Benzyna+CNG</option>
+                <option value="4">Elektryczny</option>
+                <option value="5">Etanol</option>
+                <option value="6">Hybryda</option>
+                <option value="7">Wodór</option>
+            </select><br><br>
+
+            <button type="button" onclick="predictPrice()">Predict Price</button>
+        </form>
+        <div id="prediction-result" style="display:none;">
+            <h3>Estimated Price: <span id="predicted-price" style="color:#00ff00;"></span></h3>
+        </div>
     </div>
 
     <script>
@@ -44,6 +101,107 @@
                 },
                 error: function(xhr, status, error) {
                     console.error("Failed to fetch models: ", status, error); // Debug log
+                }
+            });
+        }
+
+        function fetchCarGenerations() {
+            var carMake = $('#dropdown-make').val();
+            var carModel = $('#dropdown-model').val();
+            console.log("Selected car model: " + carModel); // Debug log
+            $.ajax({
+                url: '/get_car_generations',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({car_make: carMake, car_model: carModel}),
+                success: function(generations) {
+                    console.log("Received generations: ", generations); // Debug log
+                    var generationDropdown = $('#dropdown-generation');
+                    generationDropdown.empty();
+                    generationDropdown.append('<option value="" disabled selected>Select a generation (if applicable)</option>');
+                    generations.forEach(function(generation) {
+                        generationDropdown.append('<option value="' + generation + '">' + generation + '</option>');
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to fetch generations: ", status, error); // Debug log
+                }
+            });
+        }
+
+        function scrapeAuctions() {
+            var carMake = $('#dropdown-make').val();
+            var carModel = $('#dropdown-model').val();
+            var generation = $('#dropdown-generation').val();
+            console.log("Scraping auctions for make: " + carMake + ", model: " + carModel + ", generation: " + generation); // Debug log
+            $.ajax({
+                url: '/scrape_auctions',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({car_make: carMake, car_model: carModel, generation: generation}),
+                success: function(response) {
+                    console.log("Scraping completed: ", response); // Debug log
+                    var downloadLinkDiv = $('#download-link');
+                    var csvDownloadLink = $('#csv-download');
+                    csvDownloadLink.attr('href', '/download_csv?filename=' + response.csv_filename);
+                    downloadLinkDiv.show();
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to scrape auctions: ", status, error); // Debug log
+                }
+            });
+        }
+
+        function uploadCSV() {
+            var formData = new FormData();
+            var fileInput = $('#file-input')[0];
+            if (fileInput.files.length === 0) {
+                alert("Please select a file to upload.");
+                return;
+            }
+
+            formData.append('file', fileInput.files[0]);
+            $.ajax({
+                url: '/upload_csv',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    console.log("File uploaded and training completed: ", response); // Debug log
+                    $('#upload-message').text("File uploaded and training completed. MAE: " + response.mae + ", RMSE: " + response.rmse + ", R^2: " + response.r2);
+                    $('#upload-result').show();
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to upload and train: ", status, error); // Debug log
+                    $('#upload-message').text("Failed to upload and train: " + error);
+                    $('#upload-result').show();
+                }
+            });
+        }
+
+        function predictPrice() {
+            var formData = {
+                engine_size: $('#engine_size').val(),
+                horsepower: $('#horsepower').val(),
+                mileage: $('#mileage').val(),
+                gearbox: $('#gearbox').val(),
+                production_year: $('#production_year').val(),
+                fuel_type: $('#fuel_type').val()
+            };
+            console.log("Predicting price with data: ", formData); // Debug log
+            $.ajax({
+                url: '/predict_price',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(formData),
+                success: function(response) {
+                    console.log("Prediction result: ", response); // Debug log
+                    $('#predicted-price').text(response.predicted_price);
+                    $('#prediction-result').show();
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to predict price: ", status, error); // Debug log
                 }
             });
         }
