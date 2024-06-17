@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, jsonify, send_file
+from scraper import get_car_models, get_car_generations, generate_url, scrape_auctions
 import logging
 import pandas as pd
 import os
 import ml_model
+
 
 app = Flask(__name__)
 
