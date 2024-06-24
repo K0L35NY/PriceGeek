@@ -42,7 +42,23 @@ car_makes = [
 
 @app.route('/')
 def home():
-    return render_template('index.html', car_makes=car_makes)
+    plot_types = {
+        'histograms': 'plots/histograms',
+        'scatter_plots': 'plots/scatter_plots',
+        'correlation': 'plots/correlation',  # Add path for correlation images
+        'feature_importance': 'plots'  # Add path for feature importance
+    }
+    images = {}
+    for plot_type, relative_path in plot_types.items():
+        directory = os.path.join(app.root_path, 'static', relative_path)
+        if os.path.exists(directory):
+            # Adjust path for use in HTML
+            images[plot_type] = [relative_path + '/' + f for f in os.listdir(directory) if f.endswith('.png')]
+        else:
+            images[plot_type] = []
+
+    return render_template('index.html', car_makes=car_makes, images=images)
+
 
 @app.route('/get_car_models', methods=['POST'])
 def fetch_car_models():
@@ -220,8 +236,6 @@ def download_csv():
         return send_file(csv_path, as_attachment=True)
     else:
         return jsonify({'error': 'File not found'}), 404
-
-
 
 if __name__ == '__main__':
     if not os.path.exists('uploads'):

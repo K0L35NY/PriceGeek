@@ -85,6 +85,28 @@
         </div>
         <div id="prediction-result" style="display:none;">
             <h3>Estimated Price: <span id="predicted-price" style="color:#00ff00;"></span> zł</h3>
+            <h2>Model Analysis</h2>
+            <div class="analysis">
+                <h3>Feature Importance</h3>
+                <img src="{{ url_for('static', filename='plots/feature_importance.png') }}" alt="Feature Importance">
+
+                <h3>Histograms</h3>
+                <div class="histogram-images">
+                    <img src="{{ url_for('static', filename='plots/histograms/engine_size_histogram.png') }}" alt="Engine Size Histogram">
+                    <img src="{{ url_for('static', filename='plots/histograms/horsepower_histogram.png') }}" alt="Horsepower Histogram">
+                    <img src="{{ url_for('static', filename='plots/histograms/mileage_histogram.png') }}" alt="Mileage Histogram">
+                    <img src="{{ url_for('static', filename='plots/histograms/price_histogram.png') }}" alt="Price Histogram">
+                </div>
+
+                <h3>Scatter Plots</h3>
+                <div class="scatter-images">
+                    <img src="{{ url_for('static', filename='plots/scatter_plots/horsepower_vs_price.png') }}" alt="Horsepower vs Price Scatter Plot">
+                    <img src="{{ url_for('static', filename='plots/scatter_plots/mileage_vs_price.png') }}" alt="Mileage vs Price Scatter Plot">
+                </div>
+
+                <h3>Correlation Matrix</h3>
+                <img src="{{ url_for('static', filename='plots/correlation/correlation_matrix.png') }}" alt="Correlation Matrix">
+            </div>
         </div>
     </div>
 
