@@ -3,6 +3,9 @@ body {
     margin: 0;
     padding: 0;
     background-color: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .navbar {
@@ -10,6 +13,8 @@ body {
     color: white;
     padding: 1em;
     text-align: center;
+    width: 100%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .logo {
@@ -20,9 +25,76 @@ body {
 .content {
     margin: 2em;
     text-align: center;
+    width: 100%;
+    max-width: 600px;
+    background: white;
+    padding: 2em;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-#dropdown-menu {
+.dropdown-container {
+    margin: 1em 0;
+}
+
+select,
+input[type="number"] {
+    width: 100%;
     padding: 0.5em;
     font-size: 1em;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box; /* Ensure consistent sizing across different browsers */
+}
+
+select.loading,
+input[type="number"].loading {
+    background-color: #e0e0e0;
+    cursor: not-allowed;
+}
+
+.btn {
+    background-color: #007bff;
+    color: white;
+    padding: 0.5em 1em;
+    font-size: 1em;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 1em;
+}
+
+.btn:hover {
+    background-color: #0056b3;
+}
+
+#file-input {
+    margin: 1em 0;
+}
+
+#upload-message {
+    margin: 1em 0;
+    color: green;
+}
+
+#predicted-price {
+    font-weight: bold;
+    color: #28a745;
+}
+
+.spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(0, 123, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #007bff;
+    animation: spin 1s ease-in-out infinite;
+    margin-top: 1em;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }

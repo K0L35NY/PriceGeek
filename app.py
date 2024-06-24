@@ -1,12 +1,13 @@
-from flask import Flask, render_template, request, jsonify, send_file
-from scraper import get_car_models, get_car_generations, generate_url, scrape_auctions
-import logging
+from flask import Flask, render_template, request, jsonify, send_file, session
 import pandas as pd
+import numpy as np
 import os
+import logging
+from scraper import get_car_models, get_car_generations, generate_url, scrape_auctions
 import ml_model
 
-
 app = Flask(__name__)
+app.secret_key = '1234'
 
 # Set Flask logging level
 logging.basicConfig(level=logging.INFO)
@@ -76,16 +77,48 @@ def scrape_auctions_route():
     if not auctions:
         return jsonify({'error': 'No auction data found'}), 404
 
-    # Save auctions to CSV
+    # Save data to CSV
+    csv_filename = os.path.join('uploads', 'scraped_auctions.csv')
     df = pd.DataFrame(auctions)
-    csv_filename = 'scraped_auctions.csv'
     df.to_csv(csv_filename, index=False)
+    session['data_source'] = csv_filename  # Store CSV path in session
 
-    # Preprocess the data and train the model
+    print_unique_values(df)  # Assuming this function only prints values and doesn't affect data
+
+    # Process and train model
     df_preprocessed = ml_model.preprocess_data(csv_filename)
     mae, rmse, r2 = ml_model.train_model(df_preprocessed)
 
-    return jsonify({'message': 'Scraping and training completed', 'csv_filename': csv_filename, 'mae': mae, 'rmse': rmse, 'r2': r2})
+    return jsonify({
+        'message': 'Scraping and training completed',
+        'csv_filename': csv_filename,
+        'mae': mae,
+        'rmse': rmse,
+        'r2': r2
+    })
+
+def print_unique_values(df):
+    # Print unique fuel types
+    unique_fuel_types = np.sort(df['fuel_type'].dropna().unique())
+    print("Unique Fuel Types:", unique_fuel_types)
+
+    # For each fuel type, print unique engine sizes that appear more than once
+    for fuel_type in unique_fuel_types:
+        fuel_type_mask = df['fuel_type'] == fuel_type
+        engine_sizes = df.loc[fuel_type_mask, 'engine_size'].dropna()
+        engine_size_counts = engine_sizes.value_counts()
+        unique_engine_sizes = engine_size_counts[engine_size_counts > 1].index.sort_values()
+        print(f"Fuel Type {fuel_type}: Unique Engine Sizes:", unique_engine_sizes)
+
+        # For each engine size, print unique horsepower values
+        for engine_size in unique_engine_sizes:
+            engine_size_mask = df['engine_size'] == engine_size
+            unique_horsepowers = np.sort(df.loc[fuel_type_mask & engine_size_mask, 'horsepower'].dropna().unique())
+            print(f"Fuel Type {fuel_type}, Engine Size {engine_size}: Unique Horsepowers:", unique_horsepowers)
+
+    # Print unique production years
+    unique_production_years = np.sort(df['production_year'].dropna().unique())
+    print("Unique Production Years:", unique_production_years)
 
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
@@ -99,35 +132,95 @@ def upload_csv():
     if file:
         file_path = os.path.join('uploads', file.filename)
         file.save(file_path)
+        session['data_source'] = file_path  # Store path in session
 
-        # Preprocess the data and train the model
+        df = pd.read_csv(file_path)
+        print_unique_values(df)  # Print unique values for fuel types, engine sizes, horsepowers, and production years
+
         df_preprocessed = ml_model.preprocess_data(file_path)
         mae, rmse, r2 = ml_model.train_model(df_preprocessed)
 
-        return jsonify({'message': 'File uploaded and training completed', 'mae': mae, 'rmse': rmse, 'r2': r2})
+        return jsonify({'message': 'File uploaded and training completed', 'mae': mae, 'rmse': rmse, 'r2': r2}), file_path
 
-@app.route('/download_csv')
-def download_csv():
-    csv_filename = request.args.get('filename')
-    if csv_filename and os.path.exists(csv_filename):
-        return send_file(csv_filename, as_attachment=True)
-    else:
-        return jsonify({'error': 'File not found'}), 404
+# Mapping from fuel type string to integer for model prediction
+fuel_type_mapping = {
+    'Benzyna': 0,
+    'Diesel': 1,
+    'Benzyna+LPG': 2,
+    'Benzyna+CNG': 3,
+    'Elektryczny': 4,
+    'Etanol': 5,
+    'Hybryda': 6,
+    'Wodór': 7
+}
 
 @app.route('/predict_price', methods=['POST'])
 def predict_price():
     data = request.json
-    engine_size = float(data.get('engine_size'))
-    horsepower = float(data.get('horsepower'))
-    mileage = float(data.get('mileage'))
-    gearbox = int(data.get('gearbox'))
-    fuel_type = int(data.get('fuel_type'))
-    production_year = int(data.get('production_year'))
+    try:
+        fuel_type_str = data.get('fuel_type')
+        fuel_type = fuel_type_mapping.get(fuel_type_str, -1)
+
+        if fuel_type == -1:
+            return jsonify({'error': 'Invalid fuel type'}), 400
+
+        engine_size = float(data.get('engine_size').replace(' cm3', '').replace(' ', ''))
+        horsepower = float(data.get('horsepower').replace(' KM', '').replace(' ', ''))
+        mileage = float(data.get('mileage'))
+        gearbox = int(data.get('gearbox'))
+        production_year = int(data.get('production_year'))
+    except (ValueError, TypeError) as e:
+        return jsonify({'error': 'Invalid input data: ' + str(e)}), 400
 
     model = ml_model.load_model()
     predicted_price = ml_model.predict(model, engine_size, horsepower, mileage, gearbox, fuel_type, production_year)
 
     return jsonify({'predicted_price': predicted_price})
+
+
+def get_dataframe():
+    file_path = session.get('data_source')
+    if file_path and os.path.exists(file_path):
+        return pd.read_csv(file_path)
+    else:
+        return pd.DataFrame()  # Return an empty DataFrame if path is not set or file does not exist
+
+@app.route('/get_fuel_types', methods=['GET'])
+def get_fuel_types():
+    df = get_dataframe()  # Ensure this function correctly fetches your DataFrame
+    if not df.empty:
+        fuel_types = df['fuel_type'].dropna().unique().tolist()
+        return jsonify(fuel_types)
+    return jsonify([]), 404
+
+@app.route('/get_engine_sizes', methods=['POST'])
+def get_engine_sizes():
+    fuel_type = request.json.get('fuel_type')
+    df = get_dataframe()
+    engine_sizes = df[df['fuel_type'] == fuel_type]['engine_size'].dropna().unique().tolist()
+    return jsonify(sorted(engine_sizes))
+
+@app.route('/get_horsepowers', methods=['POST'])
+def get_horsepowers():
+    engine_size = request.json.get('engine_size')
+    df = get_dataframe()
+    horsepowers = df[df['engine_size'] == engine_size]['horsepower'].dropna().unique().tolist()
+    return jsonify(sorted(horsepowers))
+
+@app.route('/get_production_years', methods=['GET'])
+def get_production_years():
+    df = get_dataframe()
+    production_years = df['production_year'].dropna().unique().tolist()
+    return jsonify(sorted(production_years))
+
+@app.route('/download_csv')
+def download_csv():
+    csv_path = session.get('data_source')  # Assuming 'data_source' session variable holds the path to the CSV file
+    if csv_path and os.path.exists(csv_path):
+        return send_file(csv_path, as_attachment=True)
+    else:
+        return jsonify({'error': 'File not found'}), 404
+
 
 
 if __name__ == '__main__':
